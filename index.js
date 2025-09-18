@@ -472,7 +472,8 @@ app.use(express.json());
 
 // --- Set these in your .env: ---
 const pinnApiKey = process.env.WHATSAPP_API_KEY;        // Your API key from Pinnacle
-const phoneNumberId = process.env.PHONE_NUMBER_ID;      // Your business WhatsApp phone number ID (NOT the customer)
+const phoneNumberId = process.env.PHONE_NUMBER_ID;    
+const wabaid = process.env.WABA_ID; // Your business WhatsApp phone number ID (NOT the customer)
 
 function getHeaders(isFormData) {
   const base = { 'apikey': pinnApiKey };
@@ -481,21 +482,30 @@ function getHeaders(isFormData) {
 }
 
 // Example /templates endpoint with static data
-app.get('/templates', (req, res) => {
-  res.json([
-    {
-      name: "welcome_message",
-      description: "Welcome New Customer",
-      variables: ["CustomerName", "ProductName"]
-    },
-    {
-      name: "promo_offer",
-      description: "Special Promotional Offer",
-      variables: ["CustomerName", "OfferCode"]
-    }
-    // Extend or fetch live data as needed
-  ]);
+app.get('/templates', async (req, res) => {
+  try {
+    // Use your actual phoneNumberId from env
+    const url = `https://partnersv1.pinbot.ai/v3/${wabaid}/message_templates`;
+    const response = await axios.get(url, { headers: getHeaders(false) });
+    
+    // Adjust response parsing depending on Pinnacle API response shape
+    // Example: response.data.templates or response.data
+    const templates = response.data.templates || response.data || [];
+
+    // Map to simplified structure, if needed, for frontend ease
+    const simplifiedTemplates = templates.map(t => ({
+      name: t.name,
+      description: t.description,
+      variables: t.components?.find(c => c.type === 'body')?.parameters || []
+    }));
+
+    res.json(simplifiedTemplates);
+  } catch (error) {
+    console.error("Error fetching templates: ", error);
+    res.status(500).json({ error: error.message });
+  }
 });
+
 
 // Main WhatsApp send endpoint
 app.post('/send-message', async (req, res) => {
